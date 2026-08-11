@@ -14,7 +14,7 @@ jobs:
   terraform-plan:
     name: Terraform Plan - DEV
     runs-on: ubuntu-latest
-  
+
     defaults:
       run:
         working-directory: terraform/environments/dev
@@ -29,17 +29,17 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.AWS_ROLE_NAME }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ vars.DEV_AWS_ACCOUNT_ID }}:role/${{ vars.DEV_AWS_ROLE_NAME }}
+          aws-region: ${{ vars.DEV_AWS_REGION }}
 
       - name: Verify AWS account
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          echo "Expected AWS Account: ${{ vars.AWS_ACCOUNT_ID }}"
+          echo "Expected AWS Account: ${{ vars.DEV_AWS_ACCOUNT_ID }}"
           echo "Actual AWS Account:   $ACCOUNT_ID"
 
-          if [ "$ACCOUNT_ID" != "${{ vars.AWS_ACCOUNT_ID }}" ]; then
+          if [ "$ACCOUNT_ID" != "${{ vars.DEV_AWS_ACCOUNT_ID }}" ]; then
             echo "ERROR: Incorrect AWS account!"
             exit 1
           fi
@@ -55,4 +55,4 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan
-        # CI/CD OIDC pipeline test
+        
