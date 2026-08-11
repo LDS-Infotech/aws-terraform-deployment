@@ -1,4 +1,4 @@
-﻿name: Terraform Plan
+name: Terraform Plan
 
 on:
   pull_request:
@@ -28,20 +28,56 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Debug OIDC Claims
+        shell: bash
+        run: |
+          echo "Requesting GitHub OIDC token..."
+
+          TOKEN=$(curl -sS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
+            | jq -r '.value')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "ERROR: Failed to obtain OIDC token"
+            exit 1
+          fi
+
+          echo "OIDC token received successfully."
+
+          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f 2)
+
+          echo "OIDC Claims:"
+
+          python3 - "$PAYLOAD" <<'PY'
+          import sys
+          import json
+          import base64
+
+          payload = sys.argv[1]
+          payload += "=" * (-len(payload) % 4)
+
+          decoded = base64.urlsafe_b64decode(payload)
+          claims = json.loads(decoded)
+
+          for key, value in claims.items():
+              print(f"{key}: {value}")
+          PY
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.AWS_ROLE_NAME }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ vars.DEV_AWS_ACCOUNT_ID }}:role/${{ vars.DEV_AWS_ROLE_NAME }}
+          aws-region: ${{ vars.DEV_AWS_REGION }}
 
       - name: Verify AWS account
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
-          echo "Expected AWS Account: ${{ vars.AWS_ACCOUNT_ID }}"
+          echo "Expected AWS Account: ${{ vars.DEV_AWS_ACCOUNT_ID }}"
           echo "Actual AWS Account:   $ACCOUNT_ID"
 
-          if [ "$ACCOUNT_ID" != "${{ vars.AWS_ACCOUNT_ID }}" ]; then
+          if [ "$ACCOUNT_ID" != "${{ vars.DEV_AWS_ACCOUNT_ID }}" ]; then
             echo "ERROR: Incorrect AWS account!"
             exit 1
           fi
