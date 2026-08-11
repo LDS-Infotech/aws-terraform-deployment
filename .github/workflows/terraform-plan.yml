@@ -1,4 +1,4 @@
-﻿name: Terraform Plan
+name: Terraform Plan
 
 on:
   pull_request:
@@ -15,6 +15,8 @@ jobs:
     name: Terraform Plan - DEV
     runs-on: ubuntu-latest
 
+    environment: dev
+
     defaults:
       run:
         working-directory: terraform/environments/dev
@@ -27,9 +29,40 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Debug OIDC Claims
-        uses: github/actions-oidc-debugger@main
-        with:
-          audience: sts.amazonaws.com
+        shell: bash
+        run: |
+          echo "Requesting GitHub OIDC token..."
+
+          TOKEN=$(curl -sS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
+            | jq -r '.value')
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "ERROR: Failed to obtain OIDC token"
+            exit 1
+          fi
+
+          echo "OIDC token received successfully."
+
+          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f 2)
+
+          echo "OIDC Claims:"
+
+          python3 - "$PAYLOAD" <<'PY'
+          import sys
+          import json
+          import base64
+
+          payload = sys.argv[1]
+          payload += "=" * (-len(payload) % 4)
+
+          decoded = base64.urlsafe_b64decode(payload)
+          claims = json.loads(decoded)
+
+          for key, value in claims.items():
+              print(f"{key}: {value}")
+          PY
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -60,4 +93,3 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan
-
