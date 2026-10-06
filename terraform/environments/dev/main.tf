@@ -127,5 +127,6 @@ resource "aws_instance" "service" {
     Service     = var.service_name
     ManagedBy   = "Terraform"
     OS          = "Amazon Linux 2023"
-  }
+    Deployment  = "CI-CD-Fresh-EC2-Test"
 }
+  }
